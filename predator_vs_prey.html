@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Predator-Prey Simulation</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+</head>
+<body>
+    <svg id="world" width="900" height="900"></svg>
+    <svg id="stats" width="900" height="300"></svg>
+    <script>
+        const TWOPI = 2 * Math.PI;
+
+        const TYPE_EMPTY = 0;
+        const TYPE_PREDATOR = 1;
+        const TYPE_PREY = 2;
+        const TYPE_FOOD = 3;
+
+        const N_ANTS = 8;
+        const N_NEURONS = 18;
+
+        const P_TYPE = 0;
+        const P_X = 1;
+        const P_Y = 2;
+        const P_AGE = 3;
+        const P_SPEED = 4;
+        const P_DIRECTION = 5;
+        const P_R = 6;
+        const P_ANT_LENS = Array.from({length: N_ANTS}, (_, i) => i + 7);
+        const P_ANT_ANGS = Array.from({length: N_ANTS}, (_, i) => i + 7 + N_ANTS);
+        const P_NEURONS = Array.from({length: N_NEURONS}, (_, i) => i + 7 + N_ANTS + N_ANTS);
+
+        const CONST_PREDATOR_DEATH_AGE = 500;
+        const CONST_PREY_DEATH_AGE = 2000;
+
+        const DEFAULT_PRED_SPEED = 0.6;
+        const DEFAULT_PREY_SPEED = 0.6;
+        const DEFAULT_FOOD_SPEED = 0;
+
+        function getRandomDirection() {
+            return Math.random() * TWOPI;
+        }
+
+        const NUM_TYPES = 4;
+        const NUM_PARAMS = 7 + N_ANTS + N_ANTS + N_NEURONS;
+        const WH = 900;
+        const MAX_GUYS = 256;
+        const MAX_FOOD = 150;
+        let num_guys = 0;
+
+        let guys = new Array(MAX_GUYS).fill(null).map(() => new Array(NUM_PARAMS).fill(0));
+
+        function getEmptyGix() {
+            for (let i = 0; i < guys.length; i++) {
+                if (guys[i][P_TYPE] === TYPE_EMPTY) {
+                    return i;
+                }
+            }
+            return null;
+        }
+
+        function newPrey(gix = null, copyGuy = null, x = null, y = null) {
+            gix = gix || getEmptyGix();
+            if (gix === null) return null;
+
+            if (copyGuy !== null) {
+                guys[gix] = [...copyGuy];
+                guys[gix][P_TYPE] = TYPE_PREY;
+                guys[gix][P_X] += guys[gix][P_R] * (Math.random() * 2 - 1);
+                guys[gix][P_Y] += guys[gix][P_R] * (Math.random() * 2 - 1);
+                guys[gix][P_AGE] = 0;
+                guys[gix][P_SPEED] += 0.1 * (Math.random() * 2 - 1);
+                guys[gix][P_DIRECTION] += 0.1 * (Math.random() * 2 - 1);
+                for (let i = 0; i < N_ANTS * 2; i++) {
+                    guys[gix][P_ANT_LENS[0] + i] += 0.1 * (Math.random() * 2 - 1);
+                }
+                for (let i = 0; i < N_NEURONS; i++) {
+                    guys[gix][P_NEURONS[0] + i] += 0.1 * (Math.random() * 2 - 1);
+                }
+            } else {
+                guys[gix] = [
+                    TYPE_PREY,
+                    x || (Math.random() * WH),
+                    y || (Math.random() * WH),
+                    0,
+                    DEFAULT_PREY_SPEED,
+                    getRandomDirection(),
+                    10,
+                    ...Array(N_ANTS).fill(0).map(() => Math.max(P_R + 0.01, 50 * Math.random())),
+                    ...Array(N_ANTS).fill(0).map(() => TWOPI * 2 * (Math.random() - 0.5)),
+                    ...Array(N_NEURONS - 4).fill(0).map(() => Math.random()),
+                    0.1 * (Math.random() * 2 - 1),
+                    100 + (Math.random() * 2 - 1),
+                    0.1 * (Math.random() * 2 - 1),
+                    0.1 * (Math.random() * 2 - 1)
+                ];
+
+                //console.log(guys[gix]);
+            }
+            return gix;
+        }
+
+        function newPredator(gix = null, x = null, y = null) {
+            gix = gix || getEmptyGix();
+            if (gix === null) return null;
+            guys[gix] = [
+                TYPE_PREDATOR,
+                x || (Math.random() * WH),
+                y || (Math.random() * WH),
+                0,
+                DEFAULT_PRED_SPEED,
+                getRandomDirection(),
+                10,
+                ...Array(N_ANTS).fill(0).map(() => 30 * Math.random()),
+                ...Array(N_ANTS).fill(0).map(() => TWOPI * (Math.random() - 0.5)),
+                ...Array(N_NEURONS).fill(0).map(() => Math.random() - 0.5)
+            ];
+            return gix;
+        }
+
+        function newFood(gix = null, x = null, y = null) {
+            gix = gix || getEmptyGix();
+            if (gix === null) return null;
+            guys[gix] = [
+                TYPE_FOOD,
+                x || (Math.random() * WH),
+                y || (Math.random() * WH),
+                0,
+                DEFAULT_FOOD_SPEED,
+                0,
+                10,
+                ...Array(N_ANTS * 2 + N_NEURONS).fill(0)
+            ];
+            return gix;
+        }
+
+        function newEmptyAt(gix) {
+            guys[gix] = [TYPE_EMPTY, 0, 0, 0, 0, 0, 0, ...Array(N_ANTS * 2 + N_NEURONS).fill(0)];
+        }
+
+        function moveGuy(guy, actions = null) {
+            let dist;
+            let oldX = guy[P_X];
+            let oldY = guy[P_Y];
+            let oldDirection = guy[P_DIRECTION];
+
+            if (actions === null) {
+                guy[P_DIRECTION] += ((-0.5 + Math.random()) * guy[P_SPEED] / 3.0) % TWOPI;
+                dist = guy[P_SPEED] * (0.5 + 0.5 * Math.random());
+            } else {
+                guy[P_DIRECTION] += Math.max(-guy[P_SPEED], Math.min(actions[0], guy[P_SPEED])) / 100.0;
+                dist = Math.max(-guy[P_SPEED], Math.min(actions[1], guy[P_SPEED]));
+            }
+
+            guy[P_X] = (guy[P_X] + Math.cos(guy[P_DIRECTION]) * dist + WH) % WH;
+            guy[P_Y] = (guy[P_Y] + Math.sin(guy[P_DIRECTION]) * dist + WH) % WH;
+
+            if (0 && guy[P_TYPE] === TYPE_PREDATOR) {
+                console.log(`Prey moved:
+                    Old position: (${oldX.toFixed(2)}, ${oldY.toFixed(2)})
+                    New position: (${guy[P_X].toFixed(2)}, ${guy[P_Y].toFixed(2)})
+                    Old direction: ${oldDirection.toFixed(2)}
+                    New direction: ${guy[P_DIRECTION].toFixed(2)}
+                    Distance moved: ${dist.toFixed(2)}
+                    Actions: ${actions ? actions.map(a => a.toFixed(2)).join(', ') : 'null'}
+                `);
+            }
+
+        }
+
+        function findClose(type1, type2, maxDist = 100) {
+            let close = [];
+            for (let i = 0; i < guys.length; i++) {
+                if (guys[i][P_TYPE] === type1) {
+                    for (let j = 0; j < guys.length; j++) {
+                        if (guys[j][P_TYPE] === type2) {
+                            let dx = guys[i][P_X] - guys[j][P_X];
+                            let dy = guys[i][P_Y] - guys[j][P_Y];
+                            let dist = Math.sqrt(dx * dx + dy * dy);
+                            if (dist < maxDist) {
+                                close.push([i, j]);
+                            }
+                        }
+                    }
+                }
+            }
+            return close;
+        }
+
+        function sense_old(gix) {
+            let guy = guys[gix];
+            let ants = [];
+            for (let n = 0; n < N_ANTS; n++) {
+                let a_x = guy[P_X] + guy[P_ANT_LENS[n]] * Math.cos(guy[P_DIRECTION] + guy[P_ANT_ANGS[n]]);
+                let a_y = guy[P_Y] + guy[P_ANT_LENS[n]] * Math.sin(guy[P_DIRECTION] + guy[P_ANT_ANGS[n]]);
+                ants.push([a_x, a_y]);
+            }
+
+            let inputMatrix = Array(N_ANTS).fill(null).map(() => Array(NUM_TYPES).fill(0));
+
+            for (let i = 0; i < guys.length; i++) {
+                if (i === gix) continue;
+                let otherGuy = guys[i];
+                for (let n = 0; n < N_ANTS; n++) {
+                    let dx = ants[n][0] - otherGuy[P_X];
+                    let dy = ants[n][1] - otherGuy[P_Y];
+                    let dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < otherGuy[P_R]) {
+                        inputMatrix[n][otherGuy[P_TYPE]] = 1;
+                    }
+                }
+            }
+
+            console.log("inputMatrix");
+            console.log(inputMatrix);
+            return inputMatrix;
+        }
+
+        function sense(gix) {
+            let guy = guys[gix];
+            let ants = Array(P_ANT_LENS.length).fill().map(() => Array(2).fill(0));
+
+            // Calculate antenna positions
+            for (let n = 0; n < P_ANT_LENS.length; n++) {
+                let a_x = guy[P_X] + guy[P_ANT_LENS[n]] * Math.cos(guy[P_DIRECTION] + guy[P_ANT_ANGS[n]]);
+                let a_y = guy[P_Y] + guy[P_ANT_LENS[n]] * Math.sin(guy[P_DIRECTION] + guy[P_ANT_ANGS[n]]);
+                ants[n] = [a_x, a_y];
+            }
+
+            // Calculate distances between antennas and all guys
+            let dists = ants.map(ant => 
+                guys.map(g => Math.hypot(ant[0] - g[P_X], ant[1] - g[P_Y]))
+            );
+
+            // Determine which guys are within range, excluding self
+            let touching = dists.map(row => 
+                row.map((dist, i) => i !== gix && dist < guys[i][P_R])
+            );
+
+            // Determine which types of guys are sensed
+            let input_sensed = touching.map(row => {
+                let sensedTypes = row.map((touch, i) => touch ? guys[i][P_TYPE] : -1);
+                return Math.max(0, ...sensedTypes); // Use 0 as the default
+            });
+            //console.log(input_sensed);
+            // Create input matrix
+            let input_matrix = input_sensed.map(type => 
+                Array(NUM_TYPES).fill(0).map((_, i) => i === type ? 1 : 0)
+            );
+
+            //console.log(input_matrix);
+            return input_matrix;
+        }
+
+
+        function interpret(guy, inputMatrix) {
+            let numActions = 2;
+            let layer1 = guy.slice(P_NEURONS[0], P_NEURONS[0] + N_ANTS * numActions);
+            let layer2 = guy.slice(P_NEURONS[0] + N_NEURONS - NUM_TYPES);
+
+            let actions = [0, 0];
+            for (let i = 0; i < numActions; i++) {
+                for (let j = 0; j < NUM_TYPES; j++) {
+                    let sum = 0;
+                    for (let k = 0; k < N_ANTS; k++) {
+                        sum += layer1[k * numActions + i] * inputMatrix[k][j];
+                    }
+                    actions[i] += sum * layer2[j];
+                }
+            }
+
+            //console.log("interpret");
+            //console.log(actions);
+            
+            return actions;
+        }
+
+
+        function oneLoop(worldI = null) {
+            for (let gix = 0; gix < guys.length; gix++) {
+                let guy = guys[gix];
+                guy[P_AGE]++;
+
+                if (guy[P_TYPE] === TYPE_EMPTY) {
+                    if (guy[P_AGE] > Math.random() * 1000) {
+                        if (guys.filter(g => g[P_TYPE] === TYPE_FOOD).length < MAX_FOOD) {
+                            newFood(gix);
+                        }
+                    }
+                } else if (guy[P_TYPE] === TYPE_PREY) {
+                    if (guy[P_AGE] > CONST_PREY_DEATH_AGE) {
+                        newEmptyAt(gix);
+                    } else {
+                        let inputMatrix = sense(gix);
+                        let actions = interpret(guy, inputMatrix);
+                        moveGuy(guy, actions);
+                    }
+                } else if (guy[P_TYPE] === TYPE_PREDATOR) {
+                    if (guy[P_AGE] > CONST_PREDATOR_DEATH_AGE) {
+                        newEmptyAt(gix);
+                    } else {
+                        // No brain
+                        //moveGuy(guy);
+
+                        // With brain
+                        let inputMatrix = sense(gix);
+                        let actions = interpret(guy, inputMatrix);
+                        moveGuy(guy, actions);
+                    }
+                }
+            }
+
+            // Eating prey loop
+            let closePredPrey = findClose(TYPE_PREDATOR, TYPE_PREY, 18);
+            for (let [predIx, preyIx] of closePredPrey) {
+                let newPredIx = newPredator(null, guys[predIx][P_X], guys[predIx][P_Y]);
+                newEmptyAt(preyIx);
+            }
+
+            // Eating food loop
+            let closePreyFood = findClose(TYPE_PREY, TYPE_FOOD, 30);
+            for (let [preyIx, foodIx] of closePreyFood) {
+                newPrey(null, guys[preyIx]);
+                newEmptyAt(foodIx);
+            }
+
+            // Bumping prey loop
+            let bumpD = 10 * 2;
+            let closePreyPrey = findClose(TYPE_PREY, TYPE_PREY, bumpD);
+            let moved = new Set();
+            for (let [preyIx1, preyIx2] of closePreyPrey) {
+                if (preyIx1 === preyIx2) continue;
+                if (moved.has(preyIx1) || moved.has(preyIx2)) continue;
+                let distX = guys[preyIx1][P_X] - guys[preyIx2][P_X];
+                let distY = guys[preyIx1][P_Y] - guys[preyIx2][P_Y];
+                let dist = Math.sqrt(distX * distX + distY * distY);
+                let vecX = distX / (dist + 1e-3);
+                let vecY = distY / (dist + 1e-3);
+                let toMoveX = (bumpD - dist) * vecX / 2;
+                let toMoveY = (bumpD - dist) * vecY / 2;
+                guys[preyIx1][P_X] += toMoveX;
+                guys[preyIx1][P_Y] += toMoveY;
+                guys[preyIx2][P_X] -= toMoveX;
+                guys[preyIx2][P_Y] -= toMoveY;
+                moved.add(preyIx1);
+                moved.add(preyIx2);
+            }
+
+            // Bumping predator loop
+            let closePredPred = findClose(TYPE_PREDATOR, TYPE_PREDATOR, bumpD);
+            moved.clear();
+            for (let [predIx1, predIx2] of closePredPred) {
+                if (predIx1 === predIx2) continue;
+                if (moved.has(predIx1) || moved.has(predIx2)) continue;
+                let distX = guys[predIx1][P_X] - guys[predIx2][P_X];
+                let distY = guys[predIx1][P_Y] - guys[predIx2][P_Y];
+                let dist = Math.sqrt(distX * distX + distY * distY);
+                let vecX = distX / (dist + 1e-3);
+                let vecY = distY / (dist + 1e-3);
+                let toMoveX = (bumpD - dist) * vecX / 2;
+                let toMoveY = (bumpD - dist) * vecY / 2;
+                guys[predIx1][P_X] += toMoveX;
+                guys[predIx1][P_Y] += toMoveY;
+                guys[predIx2][P_X] -= toMoveX;
+                guys[predIx2][P_Y] -= toMoveY;
+                moved.add(predIx1);
+                moved.add(predIx2);
+            }
+        }
+
+        function showSvg(svgs, width = WH, height = WH) {
+            const svgStart = `<?xml version="1.0" standalone="no"?><!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd"><svg width="${width}px" height="${height}px" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">`;
+            const svgEnd = '</svg>';
+            return svgStart + svgs.join('') + svgEnd;
+        }
+
+// Add these variables at the beginning of your script
+const STATS_UPDATE_INTERVAL = 100;
+const MAX_HISTORY_LENGTH = 100;
+
+let statsHistory = {
+    preyCount: [],
+    preyAntennaLength: [],
+    preyAvgLifespan: [],
+    preyAvgSpeed: [],
+    predatorAvgLifespan: []
+};
+
+// Add these functions before the printWorld function
+
+function calculateStats() {
+    let preyCount = 0;
+    let predatorCount = 0;
+    let preyAntennaLengthSum = 0;
+    let preyAgeSum = 0;
+    let preySpeedSum = 0;
+    let predatorAgeSum = 0;
+
+    for (let guy of guys) {
+        if (guy[P_TYPE] === TYPE_PREY) {
+            preyCount++;
+            preyAntennaLengthSum += guy.slice(P_ANT_LENS[0], P_ANT_LENS[0] + N_ANTS).reduce((a, b) => a + b, 0) / N_ANTS;
+            preyAgeSum += guy[P_AGE];
+            preySpeedSum += guy[P_SPEED];
+        } else if (guy[P_TYPE] === TYPE_PREDATOR) {
+            predatorCount++;
+            predatorAgeSum += guy[P_AGE];
+        }
+    }
+
+    return {
+        preyAntennaLength: preyAntennaLengthSum / preyCount,
+        preyAvgLifespan: preyAgeSum / preyCount,
+        preyAvgSpeed: preySpeedSum / preyCount,
+        predatorAvgLifespan: predatorAgeSum / predatorCount,
+        preyCount: preyCount
+    };
+}
+
+function updateStatsHistory(stats) {
+    let maxN = 1000;
+    for (let key in stats) {
+        statsHistory[key].push(stats[key]);
+        if (statsHistory[key].length > maxN) {
+            let newHistory = [];
+            for (let i = 0; i < maxN / 10; i++) {
+                newHistory.push(statsHistory[key][i * maxN / 100]);
+            }
+            statsHistory[key] = newHistory;
+            console.log("YES", key, newHistory)
+        }
+    }
+}
+
+function drawGraph(key, data, x, y, width, height, color) {
+    if (data.length < 2) return '';
+    
+    const minValue = Math.min(...data);
+    const maxValue = Math.max(...data);
+    const valueRange = maxValue - minValue;
+
+    const points = data.map((value, index) => {
+        const xCoord = x + (index / (data.length - 1)) * width;
+        const yCoord = y + height - ((value - minValue) / valueRange) * height;
+        return `${xCoord},${yCoord}`;
+    }).join(' ');
+
+    return `
+        <text x="${x}" y="${y+height+20}" font-size="12">${key}</text>
+        <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1" />
+        <text x="${x}" y="${y+height+40}" font-size="10">${minValue.toFixed(2)}</text>
+        <text x="${x+width-30}" y="${y+height+40}" font-size="10">${maxValue.toFixed(2)}</text>
+    `;
+}
+// Replace the existing printWorld function with this one
+function printWorld(worldI = null) {
+    const colormap = {
+        [TYPE_PREDATOR]: "red",
+        [TYPE_PREY]: "green",
+        [TYPE_FOOD]: "#ccdd22"
+    };
+    let svgs = worldI !== null ? [`<text x="20" y="20">${worldI}</text>`] : [];
+    let stats_svgs = worldI !== null ? [] : [];
+
+    for (let gix = 0; gix < guys.length; gix++) {
+        let guy = guys[gix];
+        let [gtype, x, y] = [guy[P_TYPE], guy[P_X], guy[P_Y]];
+
+        if (gtype === TYPE_EMPTY) continue;
+
+        let colr = colormap[gtype];
+        let r = guy[P_R];
+        let b = gtype === TYPE_PREDATOR || gtype === TYPE_PREY ? "black" : "none";
+        for (let i = 0; i < N_ANTS; i++) {
+            let ant = guy[P_ANT_LENS[i]];
+            let ang = guy[P_ANT_ANGS[i]];
+            svgs.push(`<line x1="${x}" y1="${y}" x2="${x + ant * Math.cos(guy[P_DIRECTION] + ang)}" y2="${y + ant * Math.sin(guy[P_DIRECTION] + ang)}" stroke="${b}" />`);
+        }
+
+        svgs.push(`<circle cx="${x}" cy="${y}" r="10" fill="${colr}" />`);
+        svgs.push(`<circle cx="${x + r * Math.cos(guy[P_DIRECTION])}" cy="${y + r * Math.sin(guy[P_DIRECTION])}" r="2" fill="${b}" />`);
+        svgs.push(`<text x="${x}" y="${y}" text-anchor="middle" alignment-baseline="middle" font-size="7" fill="white">${gix}</text>`);
+    }
+
+    // Add statistics and graphs
+    if (worldI !== null && worldI > 1000) {// % STATS_UPDATE_INTERVAL === 0) {
+        const stats = calculateStats();
+        updateStatsHistory(stats);
+
+        let statsText = [
+            `Iteration: ${worldI}`,
+            `Num prey: ${stats.preyCount}`,
+            `Prey avg antenna length: ${stats.preyAntennaLength.toFixed(2)}`,
+            `Prey avg lifespan: ${stats.preyAvgLifespan.toFixed(2)}`,
+            `Prey avg speed: ${stats.preyAvgSpeed.toFixed(2)}`,
+            `Predator avg lifespan: ${stats.predatorAvgLifespan.toFixed(2)}`
+        ];
+
+        statsText.forEach((text, index) => {
+            stats_svgs.push(`<text x="10" y="${10 + index * 20}" font-size="12">${text}</text>`);
+        });
+
+        // Draw small trend graphs
+        const graphWidth = 100;
+        const graphHeight = 50;
+        const graphSpacing = 10;
+        const graphY = 20;
+
+        let graphX = WH - graphWidth * Object.keys(statsHistory).length - graphSpacing * (Object.keys(statsHistory).length - 1);
+        for (let key in statsHistory) {
+            stats_svgs.push(`<rect x="${graphX}" y="${graphY}" width="${graphWidth}" height="${graphHeight}" fill="none" stroke="black" />`);
+            stats_svgs.push(drawGraph(key, statsHistory[key], graphX, graphY, graphWidth, graphHeight, "blue"));
+            graphX += graphWidth + graphSpacing;
+        }
+    }
+
+    document.getElementById('world').innerHTML = showSvg(svgs);
+    document.getElementById('stats').innerHTML = showSvg(stats_svgs);
+}
+
+// Initialize the world
+Math.seedrandom(100);
+guys = new Array(MAX_GUYS).fill(null).map(() => new Array(NUM_PARAMS).fill(0));
+
+for (let i = 0; i < 48; i++) newFood();
+for (let i = 0; i < 25; i++) newPredator(); // BN changed from 15
+for (let i = 0; i < 10; i++) newPrey();
+
+
+
+// Modify the animate function to update stats every 10,000 iterations
+let worldI=0;
+function animate() {
+    oneLoop(worldI);
+    if (worldI % 10 === 0) {
+        printWorld(worldI);
+    }
+    if (worldI % STATS_UPDATE_INTERVAL === 0) {
+        //const stats = calculateStats();
+        //updateStatsHistory(stats);
+    }
+    worldI++;
+    requestAnimationFrame(animate);
+}
+animate();
+
+    </script>
+</body>
+</html>
+
