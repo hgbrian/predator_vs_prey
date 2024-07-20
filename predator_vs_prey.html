@@ -91,12 +91,11 @@
                     ...Array(N_ANTS).fill(0).map(() => TWOPI * 2 * (Math.random() - 0.5)),
                     ...Array(N_NEURONS - 4).fill(0).map(() => Math.random()),
                     0.1 * (Math.random() * 2 - 1),
-                    100 + (Math.random() * 2 - 1),
+                    100 + (Math.random() * 2 - 1), // HACK
                     0.1 * (Math.random() * 2 - 1),
                     0.1 * (Math.random() * 2 - 1)
                 ];
 
-                //console.log(guys[gix]);
             }
             return gix;
         }
@@ -188,35 +187,6 @@
             return close;
         }
 
-        function sense_old(gix) {
-            let guy = guys[gix];
-            let ants = [];
-            for (let n = 0; n < N_ANTS; n++) {
-                let a_x = guy[P_X] + guy[P_ANT_LENS[n]] * Math.cos(guy[P_DIRECTION] + guy[P_ANT_ANGS[n]]);
-                let a_y = guy[P_Y] + guy[P_ANT_LENS[n]] * Math.sin(guy[P_DIRECTION] + guy[P_ANT_ANGS[n]]);
-                ants.push([a_x, a_y]);
-            }
-
-            let inputMatrix = Array(N_ANTS).fill(null).map(() => Array(NUM_TYPES).fill(0));
-
-            for (let i = 0; i < guys.length; i++) {
-                if (i === gix) continue;
-                let otherGuy = guys[i];
-                for (let n = 0; n < N_ANTS; n++) {
-                    let dx = ants[n][0] - otherGuy[P_X];
-                    let dy = ants[n][1] - otherGuy[P_Y];
-                    let dist = Math.sqrt(dx * dx + dy * dy);
-                    if (dist < otherGuy[P_R]) {
-                        inputMatrix[n][otherGuy[P_TYPE]] = 1;
-                    }
-                }
-            }
-
-            console.log("inputMatrix");
-            console.log(inputMatrix);
-            return inputMatrix;
-        }
-
         function sense(gix) {
             let guy = guys[gix];
             let ants = Array(P_ANT_LENS.length).fill().map(() => Array(2).fill(0));
@@ -243,7 +213,7 @@
                 let sensedTypes = row.map((touch, i) => touch ? guys[i][P_TYPE] : -1);
                 return Math.max(0, ...sensedTypes); // Use 0 as the default
             });
-            //console.log(input_sensed);
+
             // Create input matrix
             let input_matrix = input_sensed.map(type => 
                 Array(NUM_TYPES).fill(0).map((_, i) => i === type ? 1 : 0)
@@ -269,9 +239,6 @@
                     actions[i] += sum * layer2[j];
                 }
             }
-
-            //console.log("interpret");
-            //console.log(actions);
             
             return actions;
         }
