@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Predator-Prey Simulation</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>-->
 </head>
 <body>
     <svg id="world" width="900" height="900"></svg>
@@ -520,7 +520,7 @@ function printWorld(worldI = null) {
 }
 
 // Initialize the world
-Math.seedrandom(100);
+//Math.seedrandom(100);
 guys = new Array(MAX_GUYS).fill(null).map(() => new Array(NUM_PARAMS).fill(0));
 
 for (let i = 0; i < 48; i++) newFood();
