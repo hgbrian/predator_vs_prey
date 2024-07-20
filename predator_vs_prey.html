@@ -17,8 +17,11 @@
         const TYPE_PREY = 2;
         const TYPE_FOOD = 3;
 
-        const N_ANTS = 8;
-        const N_NEURONS = 18;
+        const N_TYPES = 4; // empty, predator, prey food
+        const N_FEATS = 7; // type, x, y, age, speed, direction, r
+        const N_ANTS = 8; // antennae
+        const N_NEURONS = 18; // neurons
+        const N_PARAMS = N_FEATS + N_ANTS + N_ANTS + N_NEURONS;
 
         const P_TYPE = 0;
         const P_X = 1;
@@ -27,9 +30,9 @@
         const P_SPEED = 4;
         const P_DIRECTION = 5;
         const P_R = 6;
-        const P_ANT_LENS = Array.from({length: N_ANTS}, (_, i) => i + 7);
-        const P_ANT_ANGS = Array.from({length: N_ANTS}, (_, i) => i + 7 + N_ANTS);
-        const P_NEURONS = Array.from({length: N_NEURONS}, (_, i) => i + 7 + N_ANTS + N_ANTS);
+        const P_ANT_LENS = Array.from({length: N_ANTS}, (_, i) => i + N_FEATS);
+        const P_ANT_ANGS = Array.from({length: N_ANTS}, (_, i) => i + N_FEATS + N_ANTS);
+        const P_NEURONS = Array.from({length: N_NEURONS}, (_, i) => i + N_FEATS + N_ANTS + N_ANTS);
 
         const CONST_PREDATOR_DEATH_AGE = 500;
         const CONST_PREY_DEATH_AGE = 2000;
@@ -38,18 +41,19 @@
         const DEFAULT_PREY_SPEED = 0.6;
         const DEFAULT_FOOD_SPEED = 0;
 
-        function getRandomDirection() {
-            return Math.random() * TWOPI;
-        }
-
-        const NUM_TYPES = 4;
-        const NUM_PARAMS = 7 + N_ANTS + N_ANTS + N_NEURONS;
         const WH = 900;
         const MAX_GUYS = 256;
         const MAX_FOOD = 150;
-        let num_guys = 0;
 
-        let guys = new Array(MAX_GUYS).fill(null).map(() => new Array(NUM_PARAMS).fill(0));
+        // Stats and graphs
+        const STATS_UPDATE_INTERVAL = 100;
+        const MAX_HISTORY_LENGTH = 100;
+
+        let guys = new Array(MAX_GUYS).fill(null).map(() => new Array(N_PARAMS).fill(0));
+
+        function getRandomDirection() {
+            return Math.random() * TWOPI;
+        }
 
         function getEmptyGix() {
             for (let i = 0; i < guys.length; i++) {
@@ -95,7 +99,6 @@
                     0.1 * (Math.random() * 2 - 1),
                     0.1 * (Math.random() * 2 - 1)
                 ];
-
             }
             return gix;
         }
@@ -216,7 +219,7 @@
 
             // Create input matrix
             let input_matrix = input_sensed.map(type => 
-                Array(NUM_TYPES).fill(0).map((_, i) => i === type ? 1 : 0)
+                Array(N_TYPES).fill(0).map((_, i) => i === type ? 1 : 0)
             );
 
             //console.log(input_matrix);
@@ -227,11 +230,11 @@
         function interpret(guy, inputMatrix) {
             let numActions = 2;
             let layer1 = guy.slice(P_NEURONS[0], P_NEURONS[0] + N_ANTS * numActions);
-            let layer2 = guy.slice(P_NEURONS[0] + N_NEURONS - NUM_TYPES);
+            let layer2 = guy.slice(P_NEURONS[0] + N_NEURONS - N_TYPES);
 
             let actions = [0, 0];
             for (let i = 0; i < numActions; i++) {
-                for (let j = 0; j < NUM_TYPES; j++) {
+                for (let j = 0; j < N_TYPES; j++) {
                     let sum = 0;
                     for (let k = 0; k < N_ANTS; k++) {
                         sum += layer1[k * numActions + i] * inputMatrix[k][j];
@@ -281,7 +284,7 @@
             // Eating prey loop
             let closePredPrey = findClose(TYPE_PREDATOR, TYPE_PREY, 18);
             for (let [predIx, preyIx] of closePredPrey) {
-                let newPredIx = newPredator(null, guys[predIx][P_X], guys[predIx][P_Y]);
+                let _newPredIx = newPredator(null, guys[predIx][P_X], guys[predIx][P_Y]);
                 newEmptyAt(preyIx);
             }
 
@@ -342,9 +345,6 @@
             return svgStart + svgs.join('') + svgEnd;
         }
 
-// Add these variables at the beginning of your script
-const STATS_UPDATE_INTERVAL = 100;
-const MAX_HISTORY_LENGTH = 100;
 
 let statsHistory = {
     preyCount: [],
@@ -488,7 +488,7 @@ function printWorld(worldI = null) {
 
 // Initialize the world
 //Math.seedrandom(100);
-guys = new Array(MAX_GUYS).fill(null).map(() => new Array(NUM_PARAMS).fill(0));
+guys = new Array(MAX_GUYS).fill(null).map(() => new Array(N_PARAMS).fill(0));
 
 for (let i = 0; i < 48; i++) newFood();
 for (let i = 0; i < 25; i++) newPredator(); // BN changed from 15
