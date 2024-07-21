@@ -5,10 +5,29 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Predator-Prey Simulation</title>
     <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>-->
+    <style>
+        #container {
+            display: flex;
+            justify-content: flex-start;
+            align-items: flex-start;
+        }
+        #game-area {
+            display: flex;
+            flex-direction: column;
+        }
+        #neuronGraph {
+            margin-left: 10px;
+        }
+    </style>
 </head>
 <body>
-    <svg id="world" width="900" height="900"></svg>
-    <svg id="stats" width="900" height="300"></svg>
+    <div id="container">
+        <div id="game-area">
+            <svg id="world" width="900" height="900"></svg>
+            <svg id="stats" width="900" height="300"></svg>
+        </div>
+        <svg id="neuronGraph" width="600" height="900"></svg>
+    </div>
     <script>
         const TWOPI = 2 * Math.PI;
 
@@ -40,6 +59,10 @@
         const DEFAULT_PRED_SPEED = 0.6;
         const DEFAULT_PREY_SPEED = 0.6;
         const DEFAULT_FOOD_SPEED = 0;
+        const DEFAULT_PRED_R = 10;
+        const DEFAULT_PREY_R = 10;
+        const DEFAULT_FOOD_R = 10;
+        const DEFAULT_MUTATION_RATE = 0.1;
 
         const WH = 900;
         const MAX_GUYS = 256;
@@ -48,6 +71,14 @@
         // Stats and graphs
         const STATS_UPDATE_INTERVAL = 100;
         const MAX_HISTORY_LENGTH = 100;
+
+        // URL params
+        const url_params = new URLSearchParams(window.location.search);
+        const PREY_HAS_BRAIN = url_params.get("prey_has_brain") !== "false";
+        const PREDATOR_HAS_BRAIN = url_params.get("predator_has_brain") !== "false";
+        const BALANCE_HACK = url_params.get("BALANCE_HACK") !== "false";
+        const MUTATION_RATE = url_params.get("mutation_rate") || DEFAULT_MUTATION_RATE;
+        console.log("mutation rate", MUTATION_RATE)
 
         let guys = new Array(MAX_GUYS).fill(null).map(() => new Array(N_PARAMS).fill(0));
 
@@ -74,13 +105,13 @@
                 guys[gix][P_X] += guys[gix][P_R] * (Math.random() * 2 - 1);
                 guys[gix][P_Y] += guys[gix][P_R] * (Math.random() * 2 - 1);
                 guys[gix][P_AGE] = 0;
-                guys[gix][P_SPEED] += 0.1 * (Math.random() * 2 - 1);
-                guys[gix][P_DIRECTION] += 0.1 * (Math.random() * 2 - 1);
+                guys[gix][P_SPEED] += MUTATION_RATE * (Math.random() * 2 - 1);
+                guys[gix][P_DIRECTION] += MUTATION_RATE * (Math.random() * 2 - 1);
                 for (let i = 0; i < N_ANTS * 2; i++) {
-                    guys[gix][P_ANT_LENS[0] + i] += 0.1 * (Math.random() * 2 - 1);
+                    guys[gix][P_ANT_LENS[0] + i] += MUTATION_RATE * (Math.random() * 2 - 1);
                 }
                 for (let i = 0; i < N_NEURONS; i++) {
-                    guys[gix][P_NEURONS[0] + i] += 0.1 * (Math.random() * 2 - 1);
+                    guys[gix][P_NEURONS[0] + i] += MUTATION_RATE * (Math.random() * 2 - 1);
                 }
             } else {
                 guys[gix] = [
@@ -90,34 +121,56 @@
                     0,
                     DEFAULT_PREY_SPEED,
                     getRandomDirection(),
-                    10,
+                    DEFAULT_PREY_R,
                     ...Array(N_ANTS).fill(0).map(() => Math.max(P_R + 0.01, 50 * Math.random())),
                     ...Array(N_ANTS).fill(0).map(() => TWOPI * 2 * (Math.random() - 0.5)),
-                    ...Array(N_NEURONS - 4).fill(0).map(() => Math.random()),
-                    0.1 * (Math.random() * 2 - 1),
-                    100 + (Math.random() * 2 - 1), // HACK
-                    0.1 * (Math.random() * 2 - 1),
-                    0.1 * (Math.random() * 2 - 1)
+                    ...Array(N_NEURONS).fill(0).map(() => Math.random())
                 ];
+
+                if (BALANCE_HACK === true) {
+                    guys[gix][guys[gix].length-4] = 0.1 * (Math.random() * 2 - 1);
+                    guys[gix][guys[gix].length-3] = 100 + (Math.random() * 2 - 1);
+                    guys[gix][guys[gix].length-2] = 0.1 * (Math.random() * 2 - 1);
+                    guys[gix][guys[gix].length-1] = 0.1 * (Math.random() * 2 - 1);
+                }
             }
             return gix;
         }
 
-        function newPredator(gix = null, x = null, y = null) {
+        function newPredator(gix = null, copyGuy = null, x = null, y = null) {
             gix = gix || getEmptyGix();
             if (gix === null) return null;
-            guys[gix] = [
-                TYPE_PREDATOR,
-                x || (Math.random() * WH),
-                y || (Math.random() * WH),
-                0,
-                DEFAULT_PRED_SPEED,
-                getRandomDirection(),
-                10,
-                ...Array(N_ANTS).fill(0).map(() => 30 * Math.random()),
-                ...Array(N_ANTS).fill(0).map(() => TWOPI * (Math.random() - 0.5)),
-                ...Array(N_NEURONS).fill(0).map(() => Math.random() - 0.5)
-            ];
+
+            if (copyGuy !== null) {
+                guys[gix] = [...copyGuy];
+                guys[gix][P_TYPE] = TYPE_PREDATOR;
+                guys[gix][P_X] += guys[gix][P_R] * (Math.random() * 2 - 1);
+                guys[gix][P_Y] += guys[gix][P_R] * (Math.random() * 2 - 1);
+                guys[gix][P_AGE] = 0;
+                if (!BALANCE_HACK) {
+                    guys[gix][P_SPEED] += MUTATION_RATE * (Math.random() * 2 - 1);
+                    guys[gix][P_DIRECTION] += MUTATION_RATE * (Math.random() * 2 - 1);
+                }
+                for (let i = 0; i < N_ANTS * 2; i++) {
+                    guys[gix][P_ANT_LENS[0] + i] += MUTATION_RATE * (Math.random() * 2 - 1);
+                }
+                for (let i = 0; i < N_NEURONS; i++) {
+                    guys[gix][P_NEURONS[0] + i] += MUTATION_RATE * (Math.random() * 2 - 1);
+                }
+            } else {
+                guys[gix] = [
+                    TYPE_PREDATOR,
+                    x || (Math.random() * WH),
+                    y || (Math.random() * WH),
+                    0,
+                    DEFAULT_PRED_SPEED,
+                    getRandomDirection(),
+                    DEFAULT_PRED_R,
+                    ...Array(N_ANTS).fill(0).map(() => 30 * Math.random()),
+                    ...Array(N_ANTS).fill(0).map(() => TWOPI * (Math.random() - 0.5)),
+                    ...Array(N_NEURONS).fill(0).map(() => Math.random())
+                ];
+            }
             return gix;
         }
 
@@ -131,7 +184,7 @@
                 0,
                 DEFAULT_FOOD_SPEED,
                 0,
-                10,
+                DEFAULT_FOOD_R,
                 ...Array(N_ANTS * 2 + N_NEURONS).fill(0)
             ];
             return gix;
@@ -202,12 +255,12 @@
             }
 
             // Calculate distances between antennas and all guys
-            let dists = ants.map(ant => 
+            let dists = ants.map(ant =>
                 guys.map(g => Math.hypot(ant[0] - g[P_X], ant[1] - g[P_Y]))
             );
 
             // Determine which guys are within range, excluding self
-            let touching = dists.map(row => 
+            let touching = dists.map(row =>
                 row.map((dist, i) => i !== gix && dist < guys[i][P_R])
             );
 
@@ -218,7 +271,7 @@
             });
 
             // Create input matrix
-            let input_matrix = input_sensed.map(type => 
+            let input_matrix = input_sensed.map(type =>
                 Array(N_TYPES).fill(0).map((_, i) => i === type ? 1 : 0)
             );
 
@@ -242,7 +295,7 @@
                     actions[i] += sum * layer2[j];
                 }
             }
-            
+
             return actions;
         }
 
@@ -262,21 +315,27 @@
                     if (guy[P_AGE] > CONST_PREY_DEATH_AGE) {
                         newEmptyAt(gix);
                     } else {
-                        let inputMatrix = sense(gix);
-                        let actions = interpret(guy, inputMatrix);
-                        moveGuy(guy, actions);
+                        if (PREY_HAS_BRAIN) {
+                            let inputMatrix = sense(gix);
+                            let actions = interpret(guy, inputMatrix);
+                            moveGuy(guy, actions);
+                        }
+                        else {
+                            moveGuy(guy);
+                        }
                     }
                 } else if (guy[P_TYPE] === TYPE_PREDATOR) {
                     if (guy[P_AGE] > CONST_PREDATOR_DEATH_AGE) {
                         newEmptyAt(gix);
                     } else {
-                        // No brain
-                        //moveGuy(guy);
-
-                        // With brain
-                        let inputMatrix = sense(gix);
-                        let actions = interpret(guy, inputMatrix);
-                        moveGuy(guy, actions);
+                        if (PREDATOR_HAS_BRAIN) {
+                            let inputMatrix = sense(gix);
+                            let actions = interpret(guy, inputMatrix);
+                            moveGuy(guy, actions);
+                        }
+                        else {
+                            moveGuy(guy);
+                        }
                     }
                 }
             }
@@ -284,7 +343,7 @@
             // Eating prey loop
             let closePredPrey = findClose(TYPE_PREDATOR, TYPE_PREY, 18);
             for (let [predIx, preyIx] of closePredPrey) {
-                let _newPredIx = newPredator(null, guys[predIx][P_X], guys[predIx][P_Y]);
+                let _newPredIx = newPredator(null, guys[predIx]);
                 newEmptyAt(preyIx);
             }
 
@@ -395,14 +454,13 @@ function updateStatsHistory(stats) {
                 newHistory.push(statsHistory[key][i * maxN / 100]);
             }
             statsHistory[key] = newHistory;
-            console.log("YES", key, newHistory)
         }
     }
 }
 
 function drawGraph(key, data, x, y, width, height, color) {
     if (data.length < 2) return '';
-    
+
     const minValue = Math.min(...data);
     const maxValue = Math.max(...data);
     const valueRange = maxValue - minValue;
@@ -420,7 +478,70 @@ function drawGraph(key, data, x, y, width, height, color) {
         <text x="${x+width-30}" y="${y+height+40}" font-size="10">${maxValue.toFixed(2)}</text>
     `;
 }
-// Replace the existing printWorld function with this one
+
+function drawNeuronGraph() {
+    const svgWidth = 400;
+    const svgHeight = 900;
+    const maxNeurons = N_NEURONS;
+    const maxGuys = 256;
+    const neuronWidth = svgWidth / (maxNeurons + 1); // +1 for the type indicator
+    const neuronHeight = svgHeight / maxGuys;
+
+    let neuronSvgs = [];
+
+    // Sort guys by P_TYPE, then by age (descending)
+    let sortedGuys = guys.slice().sort((a, b) => {
+        if (a[P_TYPE] !== b[P_TYPE]) return a[P_TYPE] - b[P_TYPE];
+        return b[P_AGE] - a[P_AGE]; // Oldest at the top
+    });
+
+    // Filter out empty and food types
+    sortedGuys = sortedGuys.filter(guy => guy[P_TYPE] !== TYPE_EMPTY && guy[P_TYPE] !== TYPE_FOOD);
+
+    for (let gix = 0; gix < sortedGuys.length; gix++) {
+        let guy = sortedGuys[gix];
+
+        // Calculate y-position starting from the top
+        let y = gix * neuronHeight;
+
+        // Add the P_TYPE as the first box
+        let typeColor = guy[P_TYPE] === TYPE_PREDATOR ? 'red' : 'green';
+        neuronSvgs.push(`<rect x="0" y="${y}" width="${neuronWidth}" height="${neuronHeight}" fill="${typeColor}" />`);
+
+        for (let n = 0; n < N_NEURONS; n++) {
+            let neuronValue = guy[P_NEURONS[0] + n];
+            let color;
+
+            // Calculate color based on absolute value
+            let absValue = Math.abs(neuronValue);
+            if (absValue <= 0.1) {
+                color = 'white';
+            } else if (neuronValue > 0) {
+                if (absValue <= 0.3) color = '#FF0000'; // Red
+                else if (absValue <= 1) color = '#FF7F00'; // Orange
+                else if (absValue <= 3) color = '#FFFF00'; // Yellow
+                else if (absValue <= 10) color = '#00FF00'; // Green
+                else color = '#0000FF'; // Blue
+            } else {
+                if (absValue <= 0.3) color = '#800000'; // Dark Red
+                else if (absValue <= 1) color = '#8B4513'; // Dark Orange
+                else if (absValue <= 3) color = '#808000'; // Olive
+                else if (absValue <= 10) color = '#008000'; // Dark Green
+                else color = '#000080'; // Navy
+            }
+
+            let x = (n + 1) * neuronWidth; // Shift by 1 to account for the type box
+
+            neuronSvgs.push(`<rect x="${x}" y="${y}" width="${neuronWidth}" height="${neuronHeight}" fill="${color}" />`);
+        }
+    }
+
+    document.getElementById('neuronGraph').innerHTML = showSvg(neuronSvgs, svgWidth, svgHeight);
+}
+
+
+
+
 function printWorld(worldI = null) {
     const colormap = {
         [TYPE_PREDATOR]: "red",
@@ -484,6 +605,9 @@ function printWorld(worldI = null) {
 
     document.getElementById('world').innerHTML = showSvg(svgs);
     document.getElementById('stats').innerHTML = showSvg(stats_svgs);
+
+    drawNeuronGraph();
+
 }
 
 // Initialize the world
