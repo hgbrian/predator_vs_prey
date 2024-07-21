@@ -31,6 +31,10 @@
     <script>
         const TWOPI = 2 * Math.PI;
 
+        const WH = 900;
+        const MAX_GUYS = 256;
+        const MAX_FOOD = 150;
+
         const TYPE_EMPTY = 0;
         const TYPE_PREDATOR = 1;
         const TYPE_PREY = 2;
@@ -62,11 +66,7 @@
         const DEFAULT_PRED_R = 10;
         const DEFAULT_PREY_R = 10;
         const DEFAULT_FOOD_R = 10;
-        const DEFAULT_MUTATION_RATE = 0.1;
 
-        const WH = 900;
-        const MAX_GUYS = 256;
-        const MAX_FOOD = 150;
 
         // Stats and graphs
         const STATS_UPDATE_INTERVAL = 100;
@@ -76,8 +76,12 @@
         const url_params = new URLSearchParams(window.location.search);
         const PREY_HAS_BRAIN = url_params.get("prey_has_brain") !== "false";
         const PREDATOR_HAS_BRAIN = url_params.get("predator_has_brain") !== "false";
-        const BALANCE_HACK = url_params.get("BALANCE_HACK") !== "false";
-        const MUTATION_RATE = url_params.get("mutation_rate") || DEFAULT_MUTATION_RATE;
+        const BALANCE_HACK = url_params.get("balance_hack") !== "false";
+        const MUTATION_RATE = url_params.get("mutation_rate") || 0.1;
+        const N_START_FOOD = url_params.get("n_start_food") || 48;
+        const N_START_PREDATORS = url_params.get("n_start_predators") || 25;
+        const N_START_PREY = url_params.get("n_start_prey") || 10;
+
         console.log("mutation rate", MUTATION_RATE)
 
         let guys = new Array(MAX_GUYS).fill(null).map(() => new Array(N_PARAMS).fill(0));
@@ -410,10 +414,12 @@ let statsHistory = {
     preyAntennaLength: [],
     preyAvgLifespan: [],
     preyAvgSpeed: [],
-    predatorAvgLifespan: []
+    predatorCount: [],
+    predatorAntennaLength: [],
+    predatorAvgLifespan: [],
+    predatorAvgSpeed: []
 };
 
-// Add these functions before the printWorld function
 
 function calculateStats() {
     let preyCount = 0;
@@ -421,7 +427,9 @@ function calculateStats() {
     let preyAntennaLengthSum = 0;
     let preyAgeSum = 0;
     let preySpeedSum = 0;
+    let predatorAntennaLengthSum = 0;
     let predatorAgeSum = 0;
+    let predatorSpeedSum = 0;
 
     for (let guy of guys) {
         if (guy[P_TYPE] === TYPE_PREY) {
@@ -431,7 +439,9 @@ function calculateStats() {
             preySpeedSum += guy[P_SPEED];
         } else if (guy[P_TYPE] === TYPE_PREDATOR) {
             predatorCount++;
+            predatorAntennaLengthSum += guy.slice(P_ANT_LENS[0], P_ANT_LENS[0] + N_ANTS).reduce((a, b) => a + b, 0) / N_ANTS;
             predatorAgeSum += guy[P_AGE];
+            predatorSpeedSum += guy[P_SPEED];
         }
     }
 
@@ -439,8 +449,11 @@ function calculateStats() {
         preyAntennaLength: preyAntennaLengthSum / preyCount,
         preyAvgLifespan: preyAgeSum / preyCount,
         preyAvgSpeed: preySpeedSum / preyCount,
+        preyCount: preyCount,
+        predatorAntennaLength: predatorAntennaLengthSum / predatorCount,
         predatorAvgLifespan: predatorAgeSum / predatorCount,
-        preyCount: preyCount
+        predatorAvgSpeed: predatorSpeedSum / predatorCount,
+        predatorCount: predatorCount
     };
 }
 
@@ -458,24 +471,31 @@ function updateStatsHistory(stats) {
     }
 }
 
-function drawGraph(key, data, x, y, width, height, color) {
-    if (data.length < 2) return '';
+function drawGraph(key, preyData, predatorData, x, y, width, height) {
+    if (preyData.length < 2 && predatorData.length < 2) return '';
 
-    const minValue = Math.min(...data);
-    const maxValue = Math.max(...data);
+    const allData = [...preyData, ...predatorData];
+    const minValue = Math.min(...allData);
+    const maxValue = Math.max(...allData);
     const valueRange = maxValue - minValue;
 
-    const points = data.map((value, index) => {
-        const xCoord = x + (index / (data.length - 1)) * width;
-        const yCoord = y + height - ((value - minValue) / valueRange) * height;
-        return `${xCoord},${yCoord}`;
-    }).join(' ');
+    function getPoints(data, color) {
+        return data.map((value, index) => {
+            const xCoord = x + (index / (data.length - 1)) * width;
+            const yCoord = y + height - ((value - minValue) / valueRange) * height;
+            return `${xCoord},${yCoord}`;
+        }).join(' ');
+    }
+
+    const preyPoints = getPoints(preyData, 'green');
+    const predatorPoints = getPoints(predatorData, 'red');
 
     return `
-        <text x="${x}" y="${y+height+20}" font-size="12">${key}</text>
-        <polyline points="${points}" fill="none" stroke="${color}" stroke-width="1" />
-        <text x="${x}" y="${y+height+40}" font-size="10">${minValue.toFixed(2)}</text>
-        <text x="${x+width-30}" y="${y+height+40}" font-size="10">${maxValue.toFixed(2)}</text>
+        <text x="${x}" y="${y-10}" font-size="12">${key}</text>
+        <polyline points="${preyPoints}" fill="none" stroke="green" stroke-width="1" />
+        <polyline points="${predatorPoints}" fill="none" stroke="red" stroke-width="1" />
+        <text x="${x}" y="${y+height+20}" font-size="10">${minValue.toFixed(2)}</text>
+        <text x="${x+width-30}" y="${y+height+20}" font-size="10">${maxValue.toFixed(2)}</text>
     `;
 }
 
@@ -517,17 +537,17 @@ function drawNeuronGraph() {
             if (absValue <= 0.1) {
                 color = 'white';
             } else if (neuronValue > 0) {
-                if (absValue <= 0.3) color = '#FF0000'; // Red
-                else if (absValue <= 1) color = '#FF7F00'; // Orange
-                else if (absValue <= 3) color = '#FFFF00'; // Yellow
-                else if (absValue <= 10) color = '#00FF00'; // Green
-                else color = '#0000FF'; // Blue
+                if (absValue <= 0.3) color = '#888855'; // Red
+                else if (absValue <= 1) color = '#aa5544'; // Orange
+                else if (absValue <= 3) color = '#bb7733'; // Yellow
+                else if (absValue <= 10) color = '#dd9922'; // Green
+                else color = '#ff5500'; // Blue
             } else {
-                if (absValue <= 0.3) color = '#800000'; // Dark Red
-                else if (absValue <= 1) color = '#8B4513'; // Dark Orange
-                else if (absValue <= 3) color = '#808000'; // Olive
-                else if (absValue <= 10) color = '#008000'; // Dark Green
-                else color = '#000080'; // Navy
+                if (absValue <= 0.3) color = '#558888'; // Dark Red
+                else if (absValue <= 1) color = '#4499aa'; // Dark Orange
+                else if (absValue <= 3) color = '#33aabb'; // Olive
+                else if (absValue <= 10) color = '#22aadd'; // Dark Green
+                else color = '#0000ff'; // Navy
             }
 
             let x = (n + 1) * neuronWidth; // Shift by 1 to account for the type box
@@ -548,7 +568,7 @@ function printWorld(worldI = null) {
         [TYPE_PREY]: "green",
         [TYPE_FOOD]: "#ccdd22"
     };
-    let svgs = worldI !== null ? [`<text x="20" y="20">${worldI}</text>`] : [];
+    let svgs = [];
     let stats_svgs = worldI !== null ? [] : [];
 
     for (let gix = 0; gix < guys.length; gix++) {
@@ -572,7 +592,7 @@ function printWorld(worldI = null) {
     }
 
     // Add statistics and graphs
-    if (worldI !== null && worldI > 1000) {// % STATS_UPDATE_INTERVAL === 0) {
+    if (worldI !== null && worldI > 1000) {
         const stats = calculateStats();
         updateStatsHistory(stats);
 
@@ -582,27 +602,43 @@ function printWorld(worldI = null) {
             `Prey avg antenna length: ${stats.preyAntennaLength.toFixed(2)}`,
             `Prey avg lifespan: ${stats.preyAvgLifespan.toFixed(2)}`,
             `Prey avg speed: ${stats.preyAvgSpeed.toFixed(2)}`,
-            `Predator avg lifespan: ${stats.predatorAvgLifespan.toFixed(2)}`
+            `Num predators: ${stats.predatorCount}`,
+            `Predator avg antenna length: ${stats.predatorAntennaLength.toFixed(2)}`,
+            `Predator avg lifespan: ${stats.predatorAvgLifespan.toFixed(2)}`,
+            `Predator avg speed: ${stats.predatorAvgSpeed.toFixed(2)}`
         ];
 
         statsText.forEach((text, index) => {
             stats_svgs.push(`<text x="10" y="${10 + index * 20}" font-size="12">${text}</text>`);
         });
 
-        // Draw small trend graphs
-        const graphWidth = 100;
-        const graphHeight = 50;
-        const graphSpacing = 10;
+        const graphWidth = 200;
+        const graphHeight = 100;
+        const graphSpacing = 40;
         const graphY = 20;
 
-        let graphX = WH - graphWidth * Object.keys(statsHistory).length - graphSpacing * (Object.keys(statsHistory).length - 1);
-        for (let key in statsHistory) {
-            stats_svgs.push(`<rect x="${graphX}" y="${graphY}" width="${graphWidth}" height="${graphHeight}" fill="none" stroke="black" />`);
-            stats_svgs.push(drawGraph(key, statsHistory[key], graphX, graphY, graphWidth, graphHeight, "blue"));
-            graphX += graphWidth + graphSpacing;
-        }
-    }
+        const graphParameters = [
+            { key: 'Count', prey: 'preyCount', predator: 'predatorCount' },
+            { key: 'AntennaLength', prey: 'preyAntennaLength', predator: 'predatorAntennaLength' },
+            { key: 'AvgLifespan', prey: 'preyAvgLifespan', predator: 'predatorAvgLifespan' },
+            { key: 'AvgSpeed', prey: 'preyAvgSpeed', predator: 'predatorAvgSpeed' }
+        ];
 
+        graphParameters.forEach((param, index) => {
+            const graphX = 400 + (graphWidth + graphSpacing) * (index % 2);
+            const graphYOffset = Math.floor(index / 2) * (graphHeight + graphSpacing);
+            stats_svgs.push(`<rect x="${graphX}" y="${graphY + graphYOffset}" width="${graphWidth}" height="${graphHeight}" fill="none" stroke="black" />`);
+            stats_svgs.push(drawGraph(
+                param.key,
+                statsHistory[param.prey],
+                statsHistory[param.predator],
+                graphX,
+                graphY + graphYOffset,
+                graphWidth,
+                graphHeight
+            ));
+        });
+    }
     document.getElementById('world').innerHTML = showSvg(svgs);
     document.getElementById('stats').innerHTML = showSvg(stats_svgs);
 
@@ -614,10 +650,10 @@ function printWorld(worldI = null) {
 //Math.seedrandom(100);
 guys = new Array(MAX_GUYS).fill(null).map(() => new Array(N_PARAMS).fill(0));
 
-for (let i = 0; i < 48; i++) newFood();
-for (let i = 0; i < 25; i++) newPredator(); // BN changed from 15
-for (let i = 0; i < 10; i++) newPrey();
 
+for (let i = 0; i < N_START_FOOD; i++) newFood();
+for (let i = 0; i < N_START_PREDATORS; i++) newPredator();
+for (let i = 0; i < N_START_PREY; i++) newPrey();
 
 
 // Modify the animate function to update stats every 10,000 iterations
