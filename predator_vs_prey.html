@@ -537,22 +537,17 @@ function drawNeuronGraph() {
             let color;
 
             // Calculate color based on absolute value
-            let absValue = Math.abs(neuronValue);
-            if (absValue <= 0.1) {
-                color = 'white';
-            } else if (neuronValue > 0) {
-                if (absValue <= 0.3) color = '#555500'; // Red
-                else if (absValue <= 1) color = '#777700'; // Orange
-                else if (absValue <= 3) color = '#999900'; // Yellow
-                else if (absValue <= 10) color = '#bbbb00'; // Green
-                else color = '#ffff00'; // Blue
-            } else {
-                if (absValue <= 0.3) color = '#000055'; // Dark Red
-                else if (absValue <= 1) color = '#000077'; // Dark Orange
-                else if (absValue <= 3) color = '#000099'; // Olive
-                else if (absValue <= 10) color = '#0000bb'; // Dark Green
-                else color = '#0000ff'; // Navy
-            }
+            if (neuronValue <= -10) color = "#0000ff";
+            else if (neuronValue <= -3) color = "#0000cc";
+            else if (neuronValue <= -1) color = "#0000aa";
+            else if (neuronValue <= -.3) color = "#000088";
+            else if (neuronValue <= -.1) color = "#000055";
+            else if (neuronValue <= .1) color = "#222222";
+            else if (neuronValue <= .3) color = "#555500";
+            else if (neuronValue <= 1) color = "#888800";
+            else if (neuronValue <= 3) color = "#aaaa00";
+            else if (neuronValue <= 10) color = "#cccc00";
+            else color = "#ffff00";
 
             let x = (n + 1) * neuronWidth; // Shift by 1 to account for the type box
 
