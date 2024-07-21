@@ -541,16 +541,16 @@ function drawNeuronGraph() {
             if (absValue <= 0.1) {
                 color = 'white';
             } else if (neuronValue > 0) {
-                if (absValue <= 0.3) color = '#888855'; // Red
-                else if (absValue <= 1) color = '#aa5544'; // Orange
-                else if (absValue <= 3) color = '#bb7733'; // Yellow
-                else if (absValue <= 10) color = '#dd9922'; // Green
-                else color = '#ff5500'; // Blue
+                if (absValue <= 0.3) color = '#555500'; // Red
+                else if (absValue <= 1) color = '#777700'; // Orange
+                else if (absValue <= 3) color = '#999900'; // Yellow
+                else if (absValue <= 10) color = '#bbbb00'; // Green
+                else color = '#ffff00'; // Blue
             } else {
-                if (absValue <= 0.3) color = '#558888'; // Dark Red
-                else if (absValue <= 1) color = '#4499aa'; // Dark Orange
-                else if (absValue <= 3) color = '#33aabb'; // Olive
-                else if (absValue <= 10) color = '#22aadd'; // Dark Green
+                if (absValue <= 0.3) color = '#000055'; // Dark Red
+                else if (absValue <= 1) color = '#000077'; // Dark Orange
+                else if (absValue <= 3) color = '#000099'; // Olive
+                else if (absValue <= 10) color = '#0000bb'; // Dark Green
                 else color = '#0000ff'; // Navy
             }
 
@@ -676,6 +676,7 @@ function animate() {
         //updateStatsHistory(stats);
     }
     worldI++;
+    requestAnimationFrame(animate);
 
     const endTime = performance.now();
     const iterationTime = endTime - startTime;
