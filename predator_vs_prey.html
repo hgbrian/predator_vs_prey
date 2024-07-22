@@ -6,17 +6,29 @@
     <title>Predator-Prey Simulation</title>
     <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>-->
     <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
         #container {
             display: flex;
-            justify-content: flex-start;
-            align-items: flex-start;
+            flex-wrap: wrap;
+            max-width: 100%;
         }
         #game-area {
-            display: flex;
-            flex-direction: column;
+            width: 100%;
+            max-width: 900px;
+            padding-right: 10px;
+        }
+        #world, #stats {
+            width: 100%;
+            height: auto;
         }
         #neuronGraph {
-            margin-left: 10px;
+            width: 100%;
+            height: auto;
+            max-width: 400px;
         }
     </style>
 </head>
@@ -26,7 +38,7 @@
             <svg id="world" width="900" height="900"></svg>
             <svg id="stats" width="900" height="300"></svg>
         </div>
-        <svg id="neuronGraph" width="600" height="900"></svg>
+        <svg id="neuronGraph" width="400" height="900"></svg>
     </div>
     <script>
         const TWOPI = 2 * Math.PI;
@@ -283,12 +295,12 @@
                 Array(N_TYPES).fill(0).map((_, i) => i === type ? 1 : 0)
             );
 
-            //console.log(input_matrix);
             return input_matrix;
         }
 
 
         function interpret(guy, inputMatrix) {
+            // inputMatrix is 8 (antennae) x 4 (senses)
             let numActions = 2;
             let layer1 = guy.slice(P_NEURONS[0], P_NEURONS[0] + N_ANTS * numActions);
             let layer2 = guy.slice(P_NEURONS[0] + N_NEURONS - N_TYPES);
@@ -504,8 +516,10 @@ function drawGraph(key, preyData, predatorData, x, y, width, height) {
 }
 
 function drawNeuronGraph() {
-    const svgWidth = 400;
-    const svgHeight = 900;
+    const svgWidth = document.getElementById('neuronGraph').clientWidth;
+    const svgHeight = svgWidth * 2.25; // Adjust this ratio as needed
+    console.log(svgWidth, svgHeight);
+
     const maxNeurons = N_NEURONS;
     const maxGuys = 256;
     const neuronWidth = svgWidth / (maxNeurons + 1); // +1 for the type indicator
@@ -562,6 +576,9 @@ function drawNeuronGraph() {
 
 
 function printWorld(worldI = null) {
+    const svgWidth = document.getElementById('world').clientWidth;
+    const svgHeight = svgWidth; // Keep it square
+
     const colormap = {
         [TYPE_PREDATOR]: "red",
         [TYPE_PREY]: "green",
@@ -591,7 +608,7 @@ function printWorld(worldI = null) {
     }
 
     // Add statistics and graphs
-    if (worldI !== null && worldI > 1000) {
+    if (worldI !== null) {
         const stats = calculateStats();
         updateStatsHistory(stats);
 
@@ -638,8 +655,8 @@ function printWorld(worldI = null) {
             ));
         });
     }
-    document.getElementById('world').innerHTML = showSvg(svgs);
-    document.getElementById('stats').innerHTML = showSvg(stats_svgs);
+    document.getElementById('world').innerHTML = showSvg(svgs, svgWidth, svgHeight);
+    document.getElementById('stats').innerHTML = showSvg(stats_svgs, svgWidth, svgHeight/3);
 
     drawNeuronGraph();
 
@@ -682,9 +699,10 @@ function animate() {
         lastTime = endTime;
     }
 }
+
 animate();
 
-    </script>
+</script>
 </body>
 </html>
 
