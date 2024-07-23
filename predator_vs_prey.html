@@ -9,7 +9,6 @@
         body {
             margin: 0;
             padding: 0;
-            font-family: Arial, sans-serif;
         }
         #container {
             display: flex;
@@ -30,6 +29,9 @@
             height: auto;
             max-width: 400px;
         }
+        #settings-form {
+            padding: 10px;
+        }
     </style>
 </head>
 <body>
@@ -39,6 +41,43 @@
             <svg id="stats" width="900" height="300"></svg>
         </div>
         <svg id="neuronGraph" width="400" height="900"></svg>
+
+        <form id="settings-form">
+            <h3>Simulation Settings</h3>
+            <div>
+                <label for="prey_has_brain">Prey has brain:</label>
+                <select id="prey_has_brain" name="prey_has_brain">
+                  <option value="true">True</option><option value="false">False</option>
+                </select>
+            </div>
+            <div>
+                <label for="predator_has_brain">Predator has brain:</label>
+                <select id="predator_has_brain" name="predator_has_brain">
+                  <option value="true">True</option><option value="false">False</option>
+                </select>
+            </div>
+            <div>
+                <label for="endless_moe">Endless mode:</label>
+                <select id="endless_moe" name="endless_moe">
+                  <option value="true">True</option><option value="false">False</option>
+                </select>
+            </div>
+            <div>
+                <label for="mutate_antennae">Mutate antennae:</label>
+                <select id="mutate_antennae" name="mutate_antennae">
+                  <option value="true">True</option><option value="false">False</option>
+                </select>
+            </div>
+            <div>
+                <label for="limit_speed">Limit speed:</label>
+                <input type="number" id="limit_speed" name="limit_speed" value="0" step="1" min="0">
+            </div>
+            <div>
+                <label for="mutation_rate">Mutation Rate:</label>
+                <input type="number" id="mutation_rate" name="mutation_rate" value="0.01" step="0.01" min="0">
+            </div>
+            <button type="submit">Apply Settings & Restart</button>
+        </form>
     </div>
     <script>
         const TWOPI = 2 * Math.PI;
@@ -55,7 +94,7 @@
         const N_TYPES = 4; // empty, predator, prey food
         const N_FEATS = 7; // type, x, y, age, speed, direction, r
         const N_ANTS = 8; // antennae
-        const N_NEURONS = 18; // neurons
+        const N_NEURONS = N_ANTS*2 + N_TYPES; // 20 neurons by default
         const N_PARAMS = N_FEATS + N_ANTS + N_ANTS + N_NEURONS;
 
         const P_TYPE = 0;
@@ -89,10 +128,57 @@
         const PREY_HAS_BRAIN = url_params.get("prey_has_brain") !== "false";
         const PREDATOR_HAS_BRAIN = url_params.get("predator_has_brain") !== "false";
         const BALANCE_HACK = url_params.get("balance_hack") !== "false";
-        const MUTATION_RATE = url_params.get("mutation_rate") || 0.01;
+        const ENDLESS_MODE = url_params.get("endless_moe") !== "false";
+        const MUTATE_ANTENNAE = url_params.get("mutate_antennae") !== "false";
+        const MUTATION_RATE = parseFloat(url_params.get("mutation_rate") || 0.01);
+        const LIMIT_SPEED = parseFloat(url_params.get("limit_speed") || 0);
         const N_START_FOOD = url_params.get("n_start_food") || 100;
         const N_START_PREDATORS = url_params.get("n_start_predators") || 25;
         const N_START_PREY = url_params.get("n_start_prey") || 25;
+
+        if (window.location.search === '') {
+            const defaultParams = new URLSearchParams({
+                prey_has_brain: 'true',
+                predator_has_brain: 'true',
+                endless_moe: 'true',
+                mutate_antennae: 'false',
+                limit_speed: '0',
+                mutation_rate: 0.01
+            });
+            window.location.search = defaultParams.toString();
+        }
+
+        // Function to populate form with URL parameters
+        function populateForm() {
+            const form = document.getElementById('settings-form');
+            form.prey_has_brain.value = PREY_HAS_BRAIN.toString();
+            form.predator_has_brain.value = PREDATOR_HAS_BRAIN.toString();
+            form.endless_moe.value = ENDLESS_MODE.toString();
+            form.mutate_antennae.value = MUTATE_ANTENNAE.toString();
+            form.limit_speed.value = LIMIT_SPEED.toString();
+            form.mutation_rate.value = MUTATION_RATE.toString();
+        }
+
+        // Function to handle form submission
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            const form = event.target;
+            const newParams = new URLSearchParams({
+                prey_has_brain: form.prey_has_brain.value,
+                predator_has_brain: form.predator_has_brain.value,
+                endless_moe: form.endless_moe.value,
+                mutate_antennae: form.mutate_antennae.value,
+                limit_speed: form.limit_speed.value,
+                mutation_rate: form.mutation_rate.value
+            });
+            window.location.search = newParams.toString();
+        }
+
+        // Add event listeners when the DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            populateForm();
+            document.getElementById('settings-form').addEventListener('submit', handleFormSubmit);
+        });
 
         let guys = new Array(MAX_GUYS).fill(null).map(() => new Array(N_PARAMS).fill(0));
 
@@ -120,12 +206,17 @@
                 guys[gix][P_Y] += guys[gix][P_R] * (Math.random() * 2 - 1);
                 guys[gix][P_AGE] = 0;
                 guys[gix][P_SPEED] += MUTATION_RATE * (Math.random() * 2 - 1);
+                if (LIMIT_SPEED != 0) {
+                    guys[gix][P_SPEED] = Math.max(-LIMIT_SPEED, Math.min(guys[gix][P_SPEED], LIMIT_SPEED));
+                }
                 guys[gix][P_DIRECTION] += MUTATION_RATE * TWOPI * 0.1 * (Math.random() * 2 - 1);
                 for (let i = 0; i < N_ANTS; i++) {
                     guys[gix][P_ANT_LENS[0] + i] += MUTATION_RATE * (Math.random() * 2 - 1);
                 }
-                for (let i = 0; i < N_ANTS; i++) {
-                    guys[gix][P_ANT_ANGS[0] + i] += MUTATION_RATE * TWOPI * 0.1 * (Math.random() * 2 - 1);
+                if (MUTATE_ANTENNAE === true) {
+                    for (let i = 0; i < N_ANTS; i++) {
+                        guys[gix][P_ANT_ANGS[0] + i] += MUTATION_RATE * TWOPI * 0.1 * (Math.random() * 2 - 1);
+                    }
                 }
                 for (let i = 0; i < N_NEURONS; i++) {
                     guys[gix][P_NEURONS[0] + i] += MUTATION_RATE * (Math.random() * 2 - 1);
@@ -140,7 +231,7 @@
                     getRandomDirection(),
                     DEFAULT_PREY_R,
                     ...Array(N_ANTS).fill(0).map(() => Math.max(P_R + 1, 30 * Math.random())),
-                    ...Array(N_ANTS).fill(0).map(() => TWOPI * 2 * (Math.random() - 0.5)),
+                    ...Array(N_ANTS).fill(0).map((_, i) => i * TWOPI / N_ANTS),
                     ...Array(N_NEURONS).fill(0).map(() => Math.random() * 2 - 1)
                 ];
 
@@ -163,12 +254,16 @@
                 guys[gix][P_AGE] = 0;
                 guys[gix][P_SPEED] += MUTATION_RATE * (Math.random() * 2 - 1);
                 guys[gix][P_DIRECTION] += MUTATION_RATE * TWOPI * 0.1 * (Math.random() * 2 - 1);
-
+                if (LIMIT_SPEED != 0) {
+                    guys[gix][P_SPEED] = Math.max(-LIMIT_SPEED, Math.min(guys[gix][P_SPEED], LIMIT_SPEED));
+                }
                 for (let i = 0; i < N_ANTS; i++) {
                     guys[gix][P_ANT_LENS[0] + i] += MUTATION_RATE * (Math.random() * 2 - 1);
                 }
-                for (let i = 0; i < N_ANTS; i++) {
-                    guys[gix][P_ANT_ANGS[0] + i] += MUTATION_RATE * TWOPI * 0.1 * (Math.random() * 2 - 1);
+                if (MUTATE_ANTENNAE === true) {
+                    for (let i = 0; i < N_ANTS; i++) {
+                        guys[gix][P_ANT_ANGS[0] + i] += MUTATION_RATE * TWOPI * 0.1 * (Math.random() * 2 - 1);
+                    }
                 }
                 for (let i = 0; i < N_NEURONS; i++) {
                     guys[gix][P_NEURONS[0] + i] += MUTATION_RATE * (Math.random() * 2 - 1);
@@ -183,7 +278,7 @@
                     getRandomDirection(),
                     DEFAULT_PRED_R,
                     ...Array(N_ANTS).fill(0).map(() => Math.max(P_R + 1, 30 * Math.random())),
-                    ...Array(N_ANTS).fill(0).map(() => TWOPI * (Math.random() - 0.5)),
+                    ...Array(N_ANTS).fill(0).map((_, i) => i * TWOPI / N_ANTS),
                     ...Array(N_NEURONS).fill(0).map(() => Math.random() * 2 - 1)
                 ];
 
@@ -222,11 +317,12 @@
             let oldDirection = guy[P_DIRECTION];
 
             if (actions === null) {
-                guy[P_DIRECTION] += ((-0.5 + Math.random()) * guy[P_SPEED] / 3.0) % TWOPI;
-                dist = guy[P_SPEED] * (0.5 + 0.5 * Math.random());
+                guy[P_DIRECTION] = (guy[P_DIRECTION] + 0.1 * TWOPI * (Math.random() - 0.5)) % TWOPI;
+                dist = guy[P_SPEED];
             } else {
-                guy[P_DIRECTION] += Math.max(-guy[P_SPEED], Math.min(actions[0], guy[P_SPEED])) / 100.0;
-                dist = Math.max(-guy[P_SPEED], Math.min(actions[1], guy[P_SPEED]));
+                //guy[P_DIRECTION] += Math.max(-guy[P_SPEED], Math.min(actions[0], guy[P_SPEED])) / 100.0;
+                guy[P_DIRECTION] = (guy[P_DIRECTION] + (actions[0] / 100.0)) % TWOPI;
+                dist = Math.max(-guy[P_SPEED], Math.min(actions[1], guy[P_SPEED])) + (Math.random()-0.5)/1000.0;
             }
 
             guy[P_X] = (guy[P_X] + Math.cos(guy[P_DIRECTION]) * dist + WH) % WH;
@@ -321,6 +417,9 @@
 
 
         function oneLoop(worldI = null) {
+            let preyCount = guys.filter(guy => guy[P_TYPE] === TYPE_PREY).length;
+            let predatorCount = guys.filter(guy => guy[P_TYPE] === TYPE_PREDATOR).length;
+
             for (let gix = 0; gix < guys.length; gix++) {
                 let guy = guys[gix];
                 guy[P_AGE]++;
@@ -332,7 +431,7 @@
                         }
                     }
                 } else if (guy[P_TYPE] === TYPE_PREY) {
-                    if (guy[P_AGE] > CONST_PREY_DEATH_AGE) {
+                    if (guy[P_AGE] > CONST_PREY_DEATH_AGE + gix/10 && (!ENDLESS_MODE || preyCount > 10)) {
                         newEmptyAt(gix);
                     } else {
                         if (PREY_HAS_BRAIN) {
@@ -345,7 +444,7 @@
                         }
                     }
                 } else if (guy[P_TYPE] === TYPE_PREDATOR) {
-                    if (guy[P_AGE] > CONST_PREDATOR_DEATH_AGE) {
+                    if (guy[P_AGE] > CONST_PREDATOR_DEATH_AGE + gix/10 && (!ENDLESS_MODE || predatorCount > 10)) {
                         newEmptyAt(gix);
                     } else {
                         if (PREDATOR_HAS_BRAIN) {
@@ -361,21 +460,23 @@
             }
 
             // Eating prey loop
-            let closePredPrey = findClose(TYPE_PREDATOR, TYPE_PREY, 18);
-            for (let [predIx, preyIx] of closePredPrey) {
-                let _newPredIx = newPredator(null, guys[predIx]);
-                newEmptyAt(preyIx);
+            if (!ENDLESS_MODE || preyCount > 10) {
+                let closePredPrey = findClose(TYPE_PREDATOR, TYPE_PREY, DEFAULT_PREY_R + DEFAULT_PRED_R - 2);
+                for (let [predIx, preyIx] of closePredPrey) {
+                    let _newPredIx = newPredator(null, guys[predIx]);
+                    newEmptyAt(preyIx);
+                }
             }
 
             // Eating food loop
-            let closePreyFood = findClose(TYPE_PREY, TYPE_FOOD, 30);
+            let closePreyFood = findClose(TYPE_PREY, TYPE_FOOD, DEFAULT_PREY_R + DEFAULT_FOOD_R + 10);
             for (let [preyIx, foodIx] of closePreyFood) {
                 newPrey(null, guys[preyIx]);
                 newEmptyAt(foodIx);
             }
 
             // Bumping prey loop
-            let bumpD = 10 * 2;
+            let bumpD = DEFAULT_PREY_R * 2;
             let closePreyPrey = findClose(TYPE_PREY, TYPE_PREY, bumpD);
             let moved = new Set();
             for (let [preyIx1, preyIx2] of closePreyPrey) {
@@ -397,6 +498,7 @@
             }
 
             // Bumping predator loop
+            bumpD = DEFAULT_PRED_R * 2;
             let closePredPred = findClose(TYPE_PREDATOR, TYPE_PREDATOR, bumpD);
             moved.clear();
             for (let [predIx1, predIx2] of closePredPred) {
@@ -518,7 +620,6 @@ function drawGraph(key, preyData, predatorData, x, y, width, height) {
 function drawNeuronGraph() {
     const svgWidth = document.getElementById('neuronGraph').clientWidth;
     const svgHeight = svgWidth * 2.25; // Adjust this ratio as needed
-    console.log(svgWidth, svgHeight);
 
     const maxNeurons = N_NEURONS;
     const maxGuys = 256;
@@ -694,7 +795,7 @@ function animate() {
     const iterationTime = endTime - startTime;
     const totalTime = endTime - lastTime;
 
-    if (worldI % STEP === 0) {  // Log every 100 iterations
+    if (0 && worldI % STEP === 0) {  // Log every 100 iterations
         console.log(`Iteration ${worldI}: ${iterationTime.toFixed(2)}ms (Avg: ${(totalTime / STEP).toFixed(2)}ms)`);
         lastTime = endTime;
     }
