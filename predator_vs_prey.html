@@ -95,6 +95,7 @@
         const N_FEATS = 7; // type, x, y, age, speed, direction, r
         const N_ANTS = 8; // antennae
         const N_NEURONS = N_ANTS*2 + N_TYPES; // 20 neurons by default
+
         const N_PARAMS = N_FEATS + N_ANTS + N_ANTS + N_NEURONS;
 
         const P_TYPE = 0;
@@ -136,7 +137,7 @@
         const N_START_FOOD = url_params.get("n_start_food") || 100;
         const N_START_PREDATORS = url_params.get("n_start_predators") || 25;
         const N_START_PREY = url_params.get("n_start_prey") || 25;
-        const STEP = url.params.get("step") || 2;
+        const STEP = url_params.get("step") || 2;
 
         if (window.location.search === '') {
             const defaultParams = new URLSearchParams({
@@ -423,7 +424,6 @@
 
             return actions;
         }
-
 
         function oneLoop(worldI = null) {
             let preyCount = guys.filter(guy => guy[P_TYPE] === TYPE_PREY).length;
