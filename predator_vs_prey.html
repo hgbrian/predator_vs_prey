@@ -139,7 +139,8 @@
         const N_START_PREY = url_params.get("n_start_prey") || 25;
         const STEP = url_params.get("step") || 2;
 
-        if (window.location.search === '') {
+        // janky because of github preview
+        if (window.location.href.endsWith(".html")) {
             const defaultParams = new URLSearchParams({
                 prey_has_brain: 'true',
                 predator_has_brain: 'true',
