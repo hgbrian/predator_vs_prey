@@ -185,27 +185,6 @@
             form.mutation_rate.value = MUTATION_RATE.toString();
         }
 
-        // Function to handle form submission
-        function handleFormSubmit(event) {
-            event.preventDefault();
-            const form = event.target;
-            const newParams = new URLSearchParams({
-                prey_has_brain: form.prey_has_brain.value,
-                predator_has_brain: form.predator_has_brain.value,
-                endless_mode: form.endless_mode.value,
-                mutate_antennae: form.mutate_antennae.value,
-                limit_speed: form.limit_speed.value,
-                mutation_rate: form.mutation_rate.value
-            });
-            window.location.search = newParams.toString();
-        }
-
-        // Add event listeners when the DOM is loaded
-        document.addEventListener('DOMContentLoaded', function() {
-            populateForm();
-            document.getElementById('settings-form').addEventListener('submit', handleFormSubmit);
-        });
-
         let guys = new Array(MAX_GUYS).fill(null).map(() => new Array(N_PARAMS).fill(0));
         let memoryMatrices = new Array(MAX_GUYS).fill(null).map(() => 0);
 
