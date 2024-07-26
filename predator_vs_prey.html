@@ -139,24 +139,37 @@
         const N_START_PREY = url_params.get("n_start_prey") || 25;
         const STEP = url_params.get("step") || 2;
 
-        // janky because of github preview
+        // form stuff because of github preview
         document.addEventListener('DOMContentLoaded', function() {
+            // Function to populate form with URL parameters
+            function populateForm() {
+                const form = document.getElementById('settings-form');
+                form.prey_has_brain.value = PREY_HAS_BRAIN.toString();
+                form.predator_has_brain.value = PREDATOR_HAS_BRAIN.toString();
+                form.endless_mode.value = ENDLESS_MODE.toString();
+                form.mutate_antennae.value = MUTATE_ANTENNAE.toString();
+                form.limit_speed.value = LIMIT_SPEED.toString();
+                form.mutation_rate.value = MUTATION_RATE.toString();
+            }
+
             // Function to apply settings and refresh
             function applySettingsAndRefresh(event) {
                 event.preventDefault();
+                const form = document.getElementById('settings-form');
 
-                // Get the base URL (everything up to and including .html)
                 let baseUrl = window.location.href.split('.html')[0] + '.html';
-                // Construct the new URL with parameters
-                let newUrl = baseUrl + '?' +
-                            'prey_has_brain=true&' +
-                            'predator_has_brain=true&' +
-                            'endless_mode=true&' +
-                            'mutate_antennae=true&' +
-                            'limit_speed=0&' +
-                            'mutation_rate=0.01';
 
-                // Redirect to the new URL
+                // Construct the new URL with parameters
+                let params = new URLSearchParams({
+                    prey_has_brain: form.prey_has_brain.value,
+                    predator_has_brain: form.predator_has_brain.value,
+                    endless_mode: form.endless_mode.value,
+                    mutate_antennae: form.mutate_antennae.value,
+                    limit_speed: form.limit_speed.value,
+                    mutation_rate: form.mutation_rate.value
+                });
+
+                let newUrl = `${baseUrl}?${params.toString()}`;
                 window.location.href = newUrl;
             }
 
@@ -170,19 +183,12 @@
             if (form) {
                 form.addEventListener('submit', applySettingsAndRefresh);
             }
-            });
+
+            populateForm();
+        });
 
 
-        // Function to populate form with URL parameters
-        function populateForm() {
-            const form = document.getElementById('settings-form');
-            form.prey_has_brain.value = PREY_HAS_BRAIN.toString();
-            form.predator_has_brain.value = PREDATOR_HAS_BRAIN.toString();
-            form.endless_mode.value = ENDLESS_MODE.toString();
-            form.mutate_antennae.value = MUTATE_ANTENNAE.toString();
-            form.limit_speed.value = LIMIT_SPEED.toString();
-            form.mutation_rate.value = MUTATION_RATE.toString();
-        }
+
 
         let guys = new Array(MAX_GUYS).fill(null).map(() => new Array(N_PARAMS).fill(0));
         let memoryMatrices = new Array(MAX_GUYS).fill(null).map(() => 0);
