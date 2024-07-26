@@ -148,7 +148,9 @@
                 limit_speed: '0',
                 mutation_rate: 0.01
             });
-            window.location.search = defaultParams.toString();
+            const newUrl = new URL(window.location.href);
+            newUrl.search = defaultParams.toString();
+            window.location.href = newUrl.toString();
         }
 
         // Function to populate form with URL parameters
@@ -215,7 +217,7 @@
                 }
                 guys[gix][P_DIRECTION] += MUTATION_RATE * TWOPI * 0.1 * (Math.random() * 2 - 1);
                 for (let i = 0; i < N_ANTS; i++) {
-                    guys[gix][P_ANT_LENS[0] + i] += MUTATION_RATE * (Math.random() * 2 - 1);
+                    guys[gix][P_ANT_LENS[0] + i] += MUTATION_RATE * 3 * (Math.random() * 2 - 1);
                 }
                 if (MUTATE_ANTENNAE === true) {
                     for (let i = 0; i < N_ANTS; i++) {
@@ -265,7 +267,7 @@
                     guys[gix][P_SPEED] = Math.max(-LIMIT_SPEED, Math.min(guys[gix][P_SPEED], LIMIT_SPEED));
                 }
                 for (let i = 0; i < N_ANTS; i++) {
-                    guys[gix][P_ANT_LENS[0] + i] += MUTATION_RATE * (Math.random() * 2 - 1);
+                    guys[gix][P_ANT_LENS[0] + i] += MUTATION_RATE * 3 * (Math.random() * 2 - 1);
                 }
                 if (MUTATE_ANTENNAE === true) {
                     for (let i = 0; i < N_ANTS; i++) {
