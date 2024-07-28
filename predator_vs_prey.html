@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=3.0, user-scalable=yes">
+
     <title>Predator-Prey Simulation</title>
     <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/seedrandom/3.0.5/seedrandom.min.js"></script>-->
     <style>
@@ -786,6 +787,34 @@ for (let i = 0; i < N_START_PREY; i++) newPrey();
 // Modify the animate function to update stats every 10,000 iterations
 let worldI=0;
 let lastTime = performance.now();
+
+// For animate_video only
+const TARGET_FPS = 15;
+const FRAME_INTERVAL = 1000 / TARGET_FPS; // in milliseconds
+let lastFrameTime = 0;
+let frameCount = 0;
+
+function animate_video(currentTime) {
+    if (lastFrameTime === 0) lastFrameTime = currentTime;
+    const elapsed = currentTime - lastFrameTime;
+
+    if (elapsed >= FRAME_INTERVAL) {
+        // Run simulation steps
+        for (let i = 0; i < STEP; i++) {
+            oneLoop(worldI);
+            worldI++;
+        }
+
+        // Render frame
+        printWorld(worldI);
+
+        lastFrameTime = currentTime - (elapsed % FRAME_INTERVAL);
+        frameCount++;
+    }
+
+    setTimeout(() => animate_video(performance.now()), 0);
+}
+
 function animate() {
     const startTime = performance.now();
 
@@ -810,7 +839,9 @@ function animate() {
     }
 }
 
+// animate_video for fixed frame rate
 animate();
+//animate_video(performance.now());
 
 </script>
 </body>
